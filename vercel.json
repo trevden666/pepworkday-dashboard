@@ -1,0 +1,17 @@
+{
+  "buildCommand": "cd pepworkday-pipeline && npm run build",
+  "outputDirectory": "pepworkday-pipeline/.next",
+  "installCommand": "cd pepworkday-pipeline && npm install",
+  "framework": "nextjs",
+  "functions": {
+    "pepworkday-pipeline/pages/api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/pepworkday-pipeline/$1"
+    }
+  ]
+}
