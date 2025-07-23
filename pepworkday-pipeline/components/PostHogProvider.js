@@ -10,12 +10,11 @@
  * @version 1.0.0
  */
 
-import { useEffect, useState, createContext, useContext } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
+import posthog from 'posthog-js';
+import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { POSTHOG_KEY, POSTHOG_HOST, isAnalyticsEnabled, trackPageView } from '../lib/analytics';
-
-// PostHog context
-const PostHogContext = createContext(null);
 
 /**
  * PostHog configuration options
@@ -67,7 +66,7 @@ const postHogConfig = {
  */
 function PostHogPageViewTracker() {
   const router = useRouter();
-  const posthog = useContext(PostHogContext);
+  const posthog = usePostHog();
 
   useEffect(() => {
     if (!isAnalyticsEnabled() || !posthog) return;
@@ -99,8 +98,6 @@ function PostHogPageViewTracker() {
  * @returns {JSX.Element} PostHog provider wrapper
  */
 export default function PostHogProvider({ children }) {
-  const [posthog, setPosthog] = useState(null);
-
   useEffect(() => {
     // Don't initialize PostHog if analytics is disabled or key is missing
     if (!isAnalyticsEnabled() || !POSTHOG_KEY) {
@@ -108,22 +105,23 @@ export default function PostHogProvider({ children }) {
       return;
     }
 
-    // Dynamic import to avoid SSR issues
-    import('posthog-js').then((posthogModule) => {
-      const posthogInstance = posthogModule.default;
-      posthogInstance.init(POSTHOG_KEY, postHogConfig);
-      setPosthog(posthogInstance);
-    }).catch((error) => {
-      console.error('❌ PostHog initialization error:', error);
-    });
+    // Initialize PostHog
+    if (typeof window !== 'undefined') {
+      posthog.init(POSTHOG_KEY, postHogConfig);
+    }
   }, []);
 
+  // Don't render provider if analytics is disabled
+  if (!isAnalyticsEnabled() || !POSTHOG_KEY) {
+    return <>{children}</>;
+  }
+
   return (
-    <PostHogContext.Provider value={posthog}>
+    <PHProvider client={posthog}>
       <PostHogPageViewTracker />
       <PostHogInitializer />
       {children}
-    </PostHogContext.Provider>
+    </PHProvider>
   );
 }
 
@@ -132,7 +130,7 @@ export default function PostHogProvider({ children }) {
  * Handles initial setup and configuration
  */
 function PostHogInitializer() {
-  const posthog = useContext(PostHogContext);
+  const posthog = usePostHog();
   
   useEffect(() => {
     if (!posthog) return;
@@ -178,7 +176,7 @@ function PostHogInitializer() {
  */
 export function usePostHogSafe() {
   try {
-    const posthog = useContext(PostHogContext);
+    const posthog = usePostHog();
     return isAnalyticsEnabled() ? posthog : null;
   } catch (error) {
     console.error('❌ PostHog hook error:', error);
