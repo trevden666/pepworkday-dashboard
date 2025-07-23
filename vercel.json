@@ -1,17 +1,16 @@
 {
-  "buildCommand": "cd pepworkday-pipeline && npm run build",
-  "outputDirectory": "pepworkday-pipeline/.next",
-  "installCommand": "cd pepworkday-pipeline && npm install",
-  "framework": "nextjs",
-  "functions": {
-    "pepworkday-pipeline/pages/api/**/*.js": {
-      "runtime": "nodejs18.x"
-    }
-  },
-  "rewrites": [
+  "version": 2,
+  "name": "pepworkday-dashboard",
+  "builds": [
     {
-      "source": "/(.*)",
-      "destination": "/pepworkday-pipeline/$1"
+      "src": "pepworkday-pipeline/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "pepworkday-pipeline/$1"
     }
   ]
 }
