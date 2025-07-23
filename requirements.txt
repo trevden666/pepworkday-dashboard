@@ -1,0 +1,50 @@
+# Core data processing
+pandas>=2.0.0
+openpyxl>=3.1.0
+numpy>=1.24.0
+
+# Google Sheets integration
+gspread>=5.10.0
+google-auth>=2.20.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.100.0
+
+# Slack notifications
+slack-sdk>=3.21.0
+
+# Configuration and environment
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# CLI interface
+click>=8.1.0
+rich>=13.0.0
+
+# Logging and monitoring
+structlog>=23.0.0
+
+# HTTP requests and API integration
+requests>=2.31.0
+httpx>=0.24.0
+urllib3>=2.0.0
+
+# Date/time handling
+python-dateutil>=2.8.0
+
+# Development dependencies
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.4.0
+isort>=5.12.0
+pre-commit>=3.3.0
+
+# Type stubs
+types-requests>=2.31.0
+types-python-dateutil>=2.8.0
+pandas-stubs>=2.0.0

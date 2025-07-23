@@ -1,0 +1,71 @@
+{
+  "name": "pepworkday-pipeline",
+  "version": 2,
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install",
+  "devCommand": "npm run dev",
+  "functions": {
+    "pages/api/**/*.js": {
+      "runtime": "@vercel/node",
+      "maxDuration": 30,
+      "memory": 1024
+    }
+  },
+  "analytics": {
+    "enable": true
+  },
+  "speedInsights": {
+    "enable": true
+  },
+  "env": {
+    "GCP_STORAGE_BUCKET": "pepworkday-data",
+    "GCP_FILE_PREFIX": "pepmove",
+    "NODE_ENV": "production"
+  },
+  "build": {
+    "env": {
+      "SHEET_ID": "@sheet-id",
+      "GCP_SERVICE_ACCOUNT_EMAIL": "@gcp-service-account-email",
+      "GCP_PRIVATE_KEY": "@gcp-private-key",
+      "GCP_PROJECT_ID": "@gcp-project-id"
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "s-maxage=300, stale-while-revalidate=60"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/dashboard",
+      "destination": "/pages/dashboard"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/dashboard",
+      "permanent": false
+    }
+  ]
+}

@@ -1,0 +1,340 @@
+name: PepWorkday Pipeline - PEPMove Integration
+
+on:
+  # Scheduled execution - Daily at 7 AM UTC (2 AM EST)
+  schedule:
+    - cron: '0 7 * * *'
+  
+  # Manual trigger
+  workflow_dispatch:
+    inputs:
+      excel_file:
+        description: 'Excel file path (optional)'
+        required: false
+        default: 'data/dispatch_report.xlsx'
+      dry_run:
+        description: 'Run in dry-run mode'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      include_locations:
+        description: 'Include vehicle locations'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      pepmove_summary:
+        description: 'Generate PEPMove fleet summary'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+  
+  # Trigger on push to main branch
+  push:
+    branches: [ main ]
+    paths:
+      - 'pepworkday-pipeline/**'
+      - '.github/workflows/pepmove-pipeline.yml'
+  
+  # Trigger on pull requests
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'pepworkday-pipeline/**'
+
+env:
+  PYTHON_VERSION: '3.11'
+  PIPELINE_LOG_LEVEL: 'INFO'
+  
+  # PEPMove Samsara Configuration
+  SAMSARA_API_TOKEN: ${{ secrets.SAMSARA_API_TOKEN }}
+  SAMSARA_ORGANIZATION_ID: '5005620'
+  SAMSARA_GROUP_ID: '129031'
+  SAMSARA_BASE_URL: 'https://api.samsara.com'
+  SAMSARA_USE_API: 'true'
+  
+  # Google Sheets Configuration
+  GOOGLE_SHEETS_SPREADSHEET_ID: ${{ secrets.GOOGLE_SHEETS_SPREADSHEET_ID }}
+  GOOGLE_SHEETS_WORKSHEET_NAME: 'RawData'
+  
+  # Slack Configuration
+  SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+  SLACK_CHANNEL: '#automation-alerts'
+  ENABLE_SLACK_NOTIFICATIONS: 'true'
+
+jobs:
+  # Code quality checks
+  quality-checks:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8 mypy black isort pytest-cov
+    
+    - name: Run Black (Code Formatting)
+      run: |
+        black --check pepworkday-pipeline/
+    
+    - name: Run isort (Import Sorting)
+      run: |
+        isort --check-only pepworkday-pipeline/
+    
+    - name: Run Flake8 (Linting)
+      run: |
+        flake8 pepworkday-pipeline/ --max-line-length=100 --extend-ignore=E203,W503
+    
+    - name: Run MyPy (Type Checking)
+      run: |
+        mypy pepworkday-pipeline/ --ignore-missing-imports
+    
+    - name: Run Tests with Coverage
+      run: |
+        pytest pepworkday-pipeline/tests/ --cov=pepworkday-pipeline --cov-report=xml --cov-report=html
+    
+    - name: Upload Coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  # PEPMove pipeline execution
+  pepmove-pipeline:
+    name: Execute PEPMove Pipeline
+    runs-on: ubuntu-latest
+    needs: quality-checks
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (needs.quality-checks.result == 'success'))
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e pepworkday-pipeline/
+    
+    - name: Create Google Sheets credentials
+      run: |
+        echo '${{ secrets.GOOGLE_SHEETS_CREDENTIALS }}' > google_sheets_credentials.json
+        echo "GOOGLE_SHEETS_CREDENTIALS_PATH=google_sheets_credentials.json" >> $GITHUB_ENV
+    
+    - name: Create sample Excel file (if not provided)
+      run: |
+        python -c "
+        import pandas as pd
+        from datetime import datetime
+        
+        # Create sample dispatch data
+        sample_data = {
+            'driver_name': ['Driver A', 'Driver B', 'Driver C'],
+            'route_id': ['R001', 'R002', 'R003'],
+            'planned_miles': [150.5, 200.0, 175.2],
+            'planned_stops': [8, 12, 10],
+            'date': [datetime.now().date()] * 3,
+            '_kp_job_id': [f'job_{datetime.now().strftime(\"%Y%m%d\")}_{i:03d}' for i in range(3)]
+        }
+        
+        df = pd.DataFrame(sample_data)
+        df.to_excel('sample_dispatch.xlsx', index=False)
+        print('Created sample Excel file')
+        "
+    
+    - name: Test PEPMove Samsara API Connection
+      run: |
+        python -c "
+        import requests
+        import os
+        
+        api_token = os.environ.get('SAMSARA_API_TOKEN')
+        if not api_token:
+            print('⚠️ SAMSARA_API_TOKEN not set, skipping API test')
+            exit(0)
+        
+        headers = {'Authorization': f'Bearer {api_token}'}
+        response = requests.get('https://api.samsara.com/fleet/vehicles', 
+                               headers=headers, 
+                               params={'groupIds': '129031', 'limit': 1},
+                               timeout=30)
+        
+        if response.status_code == 200:
+            data = response.json()
+            vehicle_count = len(data.get('data', []))
+            print(f'✅ PEPMove API connection successful - {vehicle_count} vehicles accessible')
+        else:
+            print(f'❌ API connection failed: {response.status_code}')
+            print(f'Response: {response.text}')
+        "
+    
+    - name: Execute PEPMove Pipeline
+      run: |
+        # Determine input parameters
+        EXCEL_FILE="${{ github.event.inputs.excel_file || 'sample_dispatch.xlsx' }}"
+        DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+        INCLUDE_LOCATIONS="${{ github.event.inputs.include_locations || 'true' }}"
+        PEPMOVE_SUMMARY="${{ github.event.inputs.pepmove_summary || 'true' }}"
+        
+        # Build command
+        CMD="python -m pepworkday_pipeline.pipeline --excel $EXCEL_FILE --log-level INFO"
+        
+        if [ "$DRY_RUN" = "true" ]; then
+          CMD="$CMD --dry-run"
+        fi
+        
+        if [ "$INCLUDE_LOCATIONS" = "true" ]; then
+          CMD="$CMD --include-locations"
+        fi
+        
+        if [ "$PEPMOVE_SUMMARY" = "true" ]; then
+          CMD="$CMD --pepmove-summary"
+        fi
+        
+        # Execute pipeline
+        echo "Executing: $CMD"
+        $CMD
+    
+    - name: Run Advanced Polling (if scheduled)
+      if: github.event_name == 'schedule'
+      run: |
+        python -c "
+        from pepworkday_pipeline.core.advanced_polling import create_advanced_poller
+        from datetime import datetime, timedelta
+        
+        print('🔄 Starting advanced polling for scheduled run')
+        
+        poller = create_advanced_poller()
+        
+        # Poll data for the last hour
+        end_time = datetime.now()
+        start_time = end_time - timedelta(hours=1)
+        
+        results = poller.poll_fleet_data(
+            start_time=start_time,
+            end_time=end_time,
+            data_types=['trips', 'locations', 'driver_stats']
+        )
+        
+        total_records = sum(len(df) for df in results.values())
+        print(f'✅ Advanced polling completed: {total_records} records retrieved')
+        "
+    
+    - name: Generate Pipeline Report
+      if: always()
+      run: |
+        python -c "
+        from datetime import datetime
+        import os
+        
+        # Generate pipeline execution report
+        report = {
+            'execution_time': datetime.now().isoformat(),
+            'trigger': '${{ github.event_name }}',
+            'organization_id': '5005620',
+            'group_id': '129031',
+            'dry_run': '${{ github.event.inputs.dry_run || \"false\" }}',
+            'include_locations': '${{ github.event.inputs.include_locations || \"true\" }}',
+            'pepmove_summary': '${{ github.event.inputs.pepmove_summary || \"true\" }}',
+            'python_version': '${{ env.PYTHON_VERSION }}',
+            'runner_os': '${{ runner.os }}'
+        }
+        
+        print('📊 Pipeline Execution Report:')
+        for key, value in report.items():
+            print(f'  {key}: {value}')
+        "
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Remove credentials file
+        rm -f google_sheets_credentials.json
+        
+        # Remove sample files
+        rm -f sample_dispatch.xlsx
+    
+    - name: Upload Logs (on failure)
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: pipeline-logs
+        path: |
+          logs/
+          *.log
+        retention-days: 7
+
+  # Webhook health check
+  webhook-health:
+    name: Webhook Health Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    steps:
+    - name: Check Webhook Endpoint
+      run: |
+        # This would check if the webhook receiver is healthy
+        # For now, we'll just log that this check should be implemented
+        echo "🔍 Webhook health check - implement endpoint monitoring"
+        echo "Expected endpoint: https://your-webhook-domain.com/webhook/health"
+
+  # Notification job
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [pepmove-pipeline]
+    if: always() && github.event_name == 'schedule'
+    
+    steps:
+    - name: Send Success Notification
+      if: needs.pepmove-pipeline.result == 'success'
+      run: |
+        echo "✅ PEPMove pipeline executed successfully"
+        # Slack notification would be sent by the pipeline itself
+    
+    - name: Send Failure Notification
+      if: needs.pepmove-pipeline.result == 'failure'
+      run: |
+        echo "❌ PEPMove pipeline execution failed"
+        # Additional notification logic could be added here

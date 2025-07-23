@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PepWorkday Dashboard - PEPMove Fleet Management</title>
+    
+    <!-- Google Charts -->
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: transform 0.2s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-online { background-color: #28a745; }
+        .status-warning { background-color: #ffc107; }
+        .status-offline { background-color: #dc3545; }
+        
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .refresh-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            z-index: 1000;
+        }
+        
+        .filter-controls {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .pepmove-branding {
+            color: #667eea;
+            font-weight: bold;
+        }
+        
+        .alert-banner {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 10px 15px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .vehicle-status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .vehicle-card {
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <!-- Refresh Indicator -->
+    <div id="refreshIndicator" class="refresh-indicator" style="display: none;">
+        <i class="fas fa-sync-alt fa-spin"></i> Refreshing data...
+    </div>
+    
+    <!-- Alert Banner -->
+    <div id="alertBanner" class="alert-banner">
+        <i class="fas fa-exclamation-triangle"></i>
+        <span id="alertMessage"></span>
+    </div>
+    
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-truck"></i> PepWorkday Dashboard</h1>
+                    <p class="mb-0">
+                        <span class="pepmove-branding">PEPMove</span> Fleet Management System
+                        | Org: 5005620 | Group: 129031
+                    </p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="d-flex align-items-center justify-content-end">
+                        <span class="status-indicator status-online"></span>
+                        <span>Live Data</span>
+                        <small class="ms-3" id="lastUpdate">Last updated: --</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="container-fluid">
+        <!-- Filter Controls -->
+        <div class="filter-controls">
+            <div class="row align-items-center">
+                <div class="col-md-3">
+                    <label for="dateRange" class="form-label">Date Range</label>
+                    <select id="dateRange" class="form-select">
+                        <option value="today">Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="week" selected>Last 7 Days</option>
+                        <option value="month">Last 30 Days</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="driverFilter" class="form-label">Driver Filter</label>
+                    <select id="driverFilter" class="form-select">
+                        <option value="all">All Drivers</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="vehicleFilter" class="form-label">Vehicle Filter</label>
+                    <select id="vehicleFilter" class="form-select">
+                        <option value="all">All Vehicles</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="refreshInterval" class="form-label">Refresh Interval</label>
+                    <select id="refreshInterval" class="form-select">
+                        <option value="30">30 seconds</option>
+                        <option value="60" selected>1 minute</option>
+                        <option value="300">5 minutes</option>
+                        <option value="600">10 minutes</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Key Metrics Row -->
+        <div class="row">
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value" id="totalVehicles">--</div>
+                    <div class="metric-label">Total Vehicles</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value" id="activeVehicles">--</div>
+                    <div class="metric-label">Active Vehicles</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value" id="totalMiles">--</div>
+                    <div class="metric-label">Total Miles Today</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card text-center">
+                    <div class="metric-value" id="avgSpeed">--</div>
+                    <div class="metric-label">Avg Speed (mph)</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5><i class="fas fa-chart-line"></i> Miles vs Planned</h5>
+                    <div id="milesChart" style="height: 300px;"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h5><i class="fas fa-chart-pie"></i> Vehicle Status Distribution</h5>
+                    <div id="statusChart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Additional Charts Row -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="chart-container">
+                    <h5><i class="fas fa-chart-area"></i> Fleet Activity Timeline</h5>
+                    <div id="timelineChart" style="height: 300px;"></div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-map-marker-alt"></i> Geographic Distribution</h5>
+                    <div id="geoChart" style="height: 300px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Vehicle Status Grid -->
+        <div class="chart-container">
+            <h5><i class="fas fa-truck"></i> Vehicle Status Overview</h5>
+            <div id="vehicleStatusGrid" class="vehicle-status-grid">
+                <!-- Vehicle cards will be populated here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script type="text/javascript">
+        // Global variables
+        let refreshInterval = 60000; // 1 minute default
+        let refreshTimer;
+        let chartsLoaded = false;
+        
+        // PEPMove configuration
+        const PEPMOVE_CONFIG = {
+            organizationId: '5005620',
+            groupId: '129031',
+            apiToken: 'YOUR_API_TOKEN_HERE' // Set this via environment variable
+        };
+        
+        // Load Google Charts
+        google.charts.load('current', {
+            'packages': ['corechart', 'controls', 'geochart', 'timeline']
+        });
+        
+        google.charts.setOnLoadCallback(function() {
+            chartsLoaded = true;
+            initializeDashboard();
+        });
+        
+        function initializeDashboard() {
+            console.log('Initializing PepWorkday Dashboard for PEPMove');
+            
+            // Set up event listeners
+            setupEventListeners();
+            
+            // Initial data load
+            refreshDashboardData();
+            
+            // Start auto-refresh
+            startAutoRefresh();
+        }
+        
+        function setupEventListeners() {
+            // Filter change handlers
+            document.getElementById('dateRange').addEventListener('change', refreshDashboardData);
+            document.getElementById('driverFilter').addEventListener('change', refreshDashboardData);
+            document.getElementById('vehicleFilter').addEventListener('change', refreshDashboardData);
+            
+            // Refresh interval change
+            document.getElementById('refreshInterval').addEventListener('change', function() {
+                refreshInterval = parseInt(this.value) * 1000;
+                startAutoRefresh();
+            });
+        }
+        
+        function startAutoRefresh() {
+            // Clear existing timer
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+            
+            // Start new timer
+            refreshTimer = setInterval(refreshDashboardData, refreshInterval);
+            console.log(`Auto-refresh started: ${refreshInterval/1000} seconds`);
+        }
+        
+        async function refreshDashboardData() {
+            showRefreshIndicator();
+            
+            try {
+                // Simulate API calls (replace with actual Samsara API calls)
+                const [fleetData, tripData, locationData] = await Promise.all([
+                    fetchFleetData(),
+                    fetchTripData(),
+                    fetchLocationData()
+                ]);
+                
+                // Update metrics
+                updateKeyMetrics(fleetData);
+                
+                // Update charts
+                if (chartsLoaded) {
+                    updateMilesChart(tripData);
+                    updateStatusChart(fleetData);
+                    updateTimelineChart(tripData);
+                    updateGeoChart(locationData);
+                    updateVehicleStatusGrid(fleetData);
+                }
+                
+                // Update filters
+                updateFilterOptions(fleetData);
+                
+                // Update last refresh time
+                document.getElementById('lastUpdate').textContent = 
+                    `Last updated: ${new Date().toLocaleTimeString()}`;
+                
+            } catch (error) {
+                console.error('Error refreshing dashboard data:', error);
+                showAlert('Error refreshing data: ' + error.message);
+            } finally {
+                hideRefreshIndicator();
+            }
+        }
+        
+        async function fetchFleetData() {
+            // Simulate API call to Samsara
+            // In production, this would make actual API calls
+            return {
+                totalVehicles: 50,
+                activeVehicles: 35,
+                vehicles: generateMockVehicleData(50)
+            };
+        }
+        
+        async function fetchTripData() {
+            // Simulate trip data
+            return generateMockTripData();
+        }
+        
+        async function fetchLocationData() {
+            // Simulate location data
+            return generateMockLocationData();
+        }
+        
+        function generateMockVehicleData(count) {
+            const vehicles = [];
+            const statuses = ['Active', 'Idle', 'Maintenance', 'Offline'];
+            const cities = ['Salt Lake City', 'Seattle', 'Portland', 'Charlotte', 'New Orleans'];
+            
+            for (let i = 1; i <= count; i++) {
+                vehicles.push({
+                    id: `vehicle_${i}`,
+                    name: `Truck ${i}`,
+                    status: statuses[Math.floor(Math.random() * statuses.length)],
+                    speed: Math.random() * 70,
+                    location: cities[Math.floor(Math.random() * cities.length)],
+                    miles: Math.random() * 500,
+                    lastUpdate: new Date(Date.now() - Math.random() * 3600000)
+                });
+            }
+            return vehicles;
+        }
+        
+        function generateMockTripData() {
+            const trips = [];
+            for (let i = 0; i < 20; i++) {
+                trips.push({
+                    date: new Date(Date.now() - i * 24 * 60 * 60 * 1000),
+                    plannedMiles: 200 + Math.random() * 300,
+                    actualMiles: 180 + Math.random() * 350,
+                    driver: `Driver ${Math.floor(Math.random() * 10) + 1}`
+                });
+            }
+            return trips;
+        }
+        
+        function generateMockLocationData() {
+            return [
+                ['Utah', 15],
+                ['Washington', 12],
+                ['Oregon', 8],
+                ['North Carolina', 10],
+                ['Louisiana', 5]
+            ];
+        }
+        
+        function updateKeyMetrics(fleetData) {
+            document.getElementById('totalVehicles').textContent = fleetData.totalVehicles;
+            document.getElementById('activeVehicles').textContent = fleetData.activeVehicles;
+            
+            const totalMiles = fleetData.vehicles.reduce((sum, v) => sum + v.miles, 0);
+            document.getElementById('totalMiles').textContent = Math.round(totalMiles).toLocaleString();
+            
+            const activeVehicles = fleetData.vehicles.filter(v => v.status === 'Active');
+            const avgSpeed = activeVehicles.length > 0 ? 
+                activeVehicles.reduce((sum, v) => sum + v.speed, 0) / activeVehicles.length : 0;
+            document.getElementById('avgSpeed').textContent = Math.round(avgSpeed);
+        }
+        
+        function updateMilesChart(tripData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('date', 'Date');
+            data.addColumn('number', 'Planned Miles');
+            data.addColumn('number', 'Actual Miles');
+            
+            tripData.forEach(trip => {
+                data.addRow([trip.date, trip.plannedMiles, trip.actualMiles]);
+            });
+            
+            const options = {
+                title: 'Planned vs Actual Miles',
+                hAxis: { title: 'Date' },
+                vAxis: { title: 'Miles' },
+                colors: ['#667eea', '#764ba2'],
+                backgroundColor: 'transparent'
+            };
+            
+            const chart = new google.visualization.LineChart(document.getElementById('milesChart'));
+            chart.draw(data, options);
+        }
+        
+        function updateStatusChart(fleetData) {
+            const statusCounts = {};
+            fleetData.vehicles.forEach(vehicle => {
+                statusCounts[vehicle.status] = (statusCounts[vehicle.status] || 0) + 1;
+            });
+            
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', 'Status');
+            data.addColumn('number', 'Count');
+            
+            Object.entries(statusCounts).forEach(([status, count]) => {
+                data.addRow([status, count]);
+            });
+            
+            const options = {
+                title: 'Vehicle Status Distribution',
+                colors: ['#28a745', '#ffc107', '#dc3545', '#6c757d'],
+                backgroundColor: 'transparent'
+            };
+            
+            const chart = new google.visualization.PieChart(document.getElementById('statusChart'));
+            chart.draw(data, options);
+        }
+        
+        function updateTimelineChart(tripData) {
+            // Simplified timeline chart
+            const data = new google.visualization.DataTable();
+            data.addColumn('date', 'Date');
+            data.addColumn('number', 'Active Trips');
+            
+            tripData.forEach(trip => {
+                data.addRow([trip.date, Math.floor(Math.random() * 20) + 5]);
+            });
+            
+            const options = {
+                title: 'Fleet Activity Over Time',
+                hAxis: { title: 'Date' },
+                vAxis: { title: 'Active Trips' },
+                color: '#667eea',
+                backgroundColor: 'transparent'
+            };
+            
+            const chart = new google.visualization.AreaChart(document.getElementById('timelineChart'));
+            chart.draw(data, options);
+        }
+        
+        function updateGeoChart(locationData) {
+            const data = new google.visualization.DataTable();
+            data.addColumn('string', 'State');
+            data.addColumn('number', 'Vehicles');
+            
+            locationData.forEach(([state, count]) => {
+                data.addRow([state, count]);
+            });
+            
+            const options = {
+                region: 'US',
+                displayMode: 'regions',
+                resolution: 'provinces',
+                backgroundColor: 'transparent'
+            };
+            
+            const chart = new google.visualization.GeoChart(document.getElementById('geoChart'));
+            chart.draw(data, options);
+        }
+        
+        function updateVehicleStatusGrid(fleetData) {
+            const grid = document.getElementById('vehicleStatusGrid');
+            grid.innerHTML = '';
+            
+            fleetData.vehicles.slice(0, 12).forEach(vehicle => {
+                const card = document.createElement('div');
+                card.className = 'vehicle-card';
+                
+                const statusClass = vehicle.status === 'Active' ? 'status-online' : 
+                                  vehicle.status === 'Idle' ? 'status-warning' : 'status-offline';
+                
+                card.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>${vehicle.name}</strong>
+                        <span class="status-indicator ${statusClass}"></span>
+                    </div>
+                    <div class="small text-muted">
+                        <div>Status: ${vehicle.status}</div>
+                        <div>Speed: ${Math.round(vehicle.speed)} mph</div>
+                        <div>Location: ${vehicle.location}</div>
+                        <div>Miles: ${Math.round(vehicle.miles)}</div>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+        }
+        
+        function updateFilterOptions(fleetData) {
+            // Update driver filter
+            const driverFilter = document.getElementById('driverFilter');
+            const drivers = [...new Set(fleetData.vehicles.map(v => v.driver || 'Unknown'))];
+            
+            // Clear existing options except "All"
+            while (driverFilter.children.length > 1) {
+                driverFilter.removeChild(driverFilter.lastChild);
+            }
+            
+            drivers.forEach(driver => {
+                if (driver !== 'Unknown') {
+                    const option = document.createElement('option');
+                    option.value = driver;
+                    option.textContent = driver;
+                    driverFilter.appendChild(option);
+                }
+            });
+        }
+        
+        function showRefreshIndicator() {
+            document.getElementById('refreshIndicator').style.display = 'block';
+        }
+        
+        function hideRefreshIndicator() {
+            document.getElementById('refreshIndicator').style.display = 'none';
+        }
+        
+        function showAlert(message) {
+            const banner = document.getElementById('alertBanner');
+            const messageElement = document.getElementById('alertMessage');
+            messageElement.textContent = message;
+            banner.style.display = 'block';
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                banner.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (chartsLoaded) {
+                initializeDashboard();
+            }
+        });
+    </script>
+</body>
+</html>

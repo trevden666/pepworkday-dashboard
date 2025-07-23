@@ -1,0 +1,63 @@
+{
+  "name": "pepworkday-pipeline",
+  "version": "1.0.0",
+  "description": "Production-ready data pipeline for dispatch and Samsara report automation with Vercel dashboard integration",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "node --test tests/*.js",
+    "test:api": "node tests/testApiSummary.js",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "playwright:install": "playwright install"
+  },
+  "keywords": [
+    "pepworkday",
+    "samsara",
+    "google-cloud",
+    "vercel",
+    "dashboard",
+    "automation"
+  ],
+  "author": "PEP Automation Team",
+  "license": "MIT",
+  "dependencies": {
+    "@google-cloud/storage": "^7.7.0",
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "googleapis": "^128.0.0",
+    "chart.js": "^4.4.0",
+    "react-chartjs-2": "^5.2.0",
+    "@posthog/react": "^3.0.0",
+    "@vercel/log": "^1.0.0",
+    "cookie": "^0.6.0",
+    "dompurify": "^3.0.0",
+    "isomorphic-dompurify": "^2.0.0",
+    "js-cookie": "^3.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/js-cookie": "^3.0.6",
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0",
+    "@playwright/test": "^1.40.0",
+    "playwright": "^1.40.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/trevden666/pepworkday.git"
+  },
+  "bugs": {
+    "url": "https://github.com/trevden666/pepworkday/issues"
+  },
+  "homepage": "https://github.com/trevden666/pepworkday#readme"
+}
