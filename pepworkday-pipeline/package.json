@@ -1,6 +1,6 @@
 {
   "name": "pepworkday-pipeline",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Production-ready data pipeline for dispatch and Samsara report automation with Vercel dashboard integration",
   "main": "index.js",
   "scripts": {
