@@ -95,7 +95,7 @@ class SecureTokenManager:
     
     def _initialize_pepmove_token(self):
         """Initialize PEPMove Samsara API token."""
-        pepmove_token = "samsara_api_7qCpNNFjxM5S4jojGWzO9vxciB8o8I"
+        pepmove_token = os.getenv("SAMSARA_API_TOKEN", "your_api_token_here")
         
         self.store_token(
             token_id="pepmove_samsara",

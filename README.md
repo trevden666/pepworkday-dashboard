@@ -73,7 +73,7 @@ GOOGLE_SHEETS_SPREADSHEET_ID=your_spreadsheet_id_here
 GOOGLE_SHEETS_WORKSHEET_NAME=RawData
 
 # PEPMove Samsara Configuration
-SAMSARA_API_TOKEN=samsara_api_7qCpNNFjxM5S4jojGWzO9vxciB8o8I
+SAMSARA_API_TOKEN=your_samsara_api_token_here
 SAMSARA_BASE_URL=https://api.samsara.com
 SAMSARA_ORGANIZATION_ID=5005620
 SAMSARA_GROUP_ID=129031
@@ -362,7 +362,7 @@ The pipeline provides comprehensive Samsara API integration specifically configu
 ### PEPMove Configuration
 - **Organization ID**: 5005620
 - **Group ID**: 129031
-- **API Token**: samsara_api_7qCpNNFjxM5S4jojGWzO9vxciB8o8I
+- **API Token**: [Set via SAMSARA_API_TOKEN environment variable]
 
 ### Core Endpoints
 

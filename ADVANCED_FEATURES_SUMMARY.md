@@ -7,7 +7,7 @@ We have successfully implemented a comprehensive suite of advanced features for 
 **PEPMove Configuration:**
 - **Organization ID**: 5005620
 - **Group ID**: 129031
-- **API Token**: samsara_api_7qCpNNFjxM5S4jojGWzO9vxciB8o8I
+- **API Token**: [Set via SAMSARA_API_TOKEN environment variable]
 
 ---
 
