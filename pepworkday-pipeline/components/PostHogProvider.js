@@ -10,10 +10,12 @@
  * @version 1.0.0
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, createContext, useContext } from 'react';
 import { useRouter } from 'next/router';
-import { PostHogProvider as PHProvider, usePostHog } from '@posthog/react';
 import { POSTHOG_KEY, POSTHOG_HOST, isAnalyticsEnabled, trackPageView } from '../lib/analytics';
+
+// PostHog context
+const PostHogContext = createContext(null);
 
 /**
  * PostHog configuration options
@@ -65,57 +67,63 @@ const postHogConfig = {
  */
 function PostHogPageViewTracker() {
   const router = useRouter();
-  const posthog = usePostHog();
-  
+  const posthog = useContext(PostHogContext);
+
   useEffect(() => {
     if (!isAnalyticsEnabled() || !posthog) return;
-    
+
     const handleRouteChange = (url) => {
       // Track page view with PostHog
       trackPageView(url, document.title);
     };
-    
+
     // Track initial page view
     handleRouteChange(router.asPath);
-    
+
     // Listen for route changes
     router.events.on('routeChangeComplete', handleRouteChange);
-    
+
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange);
     };
   }, [router, posthog]);
-  
+
   return null;
 }
 
 /**
  * PostHog Provider Component
- * 
+ *
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components
  * @returns {JSX.Element} PostHog provider wrapper
  */
 export default function PostHogProvider({ children }) {
-  // Don't initialize PostHog if analytics is disabled or key is missing
-  if (!isAnalyticsEnabled() || !POSTHOG_KEY) {
-    console.log('📈 PostHog disabled: Analytics not enabled or key missing');
-    return (
-      <>
-        {children}
-      </>
-    );
-  }
-  
+  const [posthog, setPosthog] = useState(null);
+
+  useEffect(() => {
+    // Don't initialize PostHog if analytics is disabled or key is missing
+    if (!isAnalyticsEnabled() || !POSTHOG_KEY) {
+      console.log('📈 PostHog disabled: Analytics not enabled or key missing');
+      return;
+    }
+
+    // Dynamic import to avoid SSR issues
+    import('posthog-js').then((posthogModule) => {
+      const posthogInstance = posthogModule.default;
+      posthogInstance.init(POSTHOG_KEY, postHogConfig);
+      setPosthog(posthogInstance);
+    }).catch((error) => {
+      console.error('❌ PostHog initialization error:', error);
+    });
+  }, []);
+
   return (
-    <PHProvider 
-      apiKey={POSTHOG_KEY} 
-      options={postHogConfig}
-    >
+    <PostHogContext.Provider value={posthog}>
       <PostHogPageViewTracker />
       <PostHogInitializer />
       {children}
-    </PHProvider>
+    </PostHogContext.Provider>
   );
 }
 
@@ -124,7 +132,7 @@ export default function PostHogProvider({ children }) {
  * Handles initial setup and configuration
  */
 function PostHogInitializer() {
-  const posthog = usePostHog();
+  const posthog = useContext(PostHogContext);
   
   useEffect(() => {
     if (!posthog) return;
@@ -165,12 +173,12 @@ function PostHogInitializer() {
 
 /**
  * Hook to access PostHog instance with error handling
- * 
+ *
  * @returns {Object|null} PostHog instance or null if not available
  */
 export function usePostHogSafe() {
   try {
-    const posthog = usePostHog();
+    const posthog = useContext(PostHogContext);
     return isAnalyticsEnabled() ? posthog : null;
   } catch (error) {
     console.error('❌ PostHog hook error:', error);
