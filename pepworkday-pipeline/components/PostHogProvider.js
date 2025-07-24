@@ -12,8 +12,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import posthog from 'posthog-js';
-import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { POSTHOG_KEY, POSTHOG_HOST, isAnalyticsEnabled, trackPageView } from '../lib/analytics';
 
 /**
@@ -66,13 +64,12 @@ const postHogConfig = {
  */
 function PostHogPageViewTracker() {
   const router = useRouter();
-  const posthog = usePostHog();
 
   useEffect(() => {
-    if (!isAnalyticsEnabled() || !posthog) return;
+    if (!isAnalyticsEnabled()) return;
 
     const handleRouteChange = (url) => {
-      // Track page view with PostHog
+      // Track page view with Google Analytics
       trackPageView(url, document.title);
     };
 
@@ -85,125 +82,47 @@ function PostHogPageViewTracker() {
     return () => {
       router.events.off('routeChangeComplete', handleRouteChange);
     };
-  }, [router, posthog]);
+  }, [router]);
 
   return null;
 }
 
 /**
- * PostHog Provider Component
+ * PostHog Provider Component (Temporarily Disabled)
  *
  * @param {Object} props - Component props
  * @param {React.ReactNode} props.children - Child components
- * @returns {JSX.Element} PostHog provider wrapper
+ * @returns {JSX.Element} Simple wrapper without PostHog
  */
 export default function PostHogProvider({ children }) {
-  useEffect(() => {
-    // Don't initialize PostHog if analytics is disabled or key is missing
-    if (!isAnalyticsEnabled() || !POSTHOG_KEY) {
-      console.log('📈 PostHog disabled: Analytics not enabled or key missing');
-      return;
-    }
-
-    // Initialize PostHog
-    if (typeof window !== 'undefined') {
-      posthog.init(POSTHOG_KEY, postHogConfig);
-    }
-  }, []);
-
-  // Don't render provider if analytics is disabled
-  if (!isAnalyticsEnabled() || !POSTHOG_KEY) {
-    return <>{children}</>;
-  }
-
   return (
-    <PHProvider client={posthog}>
+    <>
       <PostHogPageViewTracker />
-      <PostHogInitializer />
       {children}
-    </PHProvider>
+    </>
   );
 }
 
-/**
- * PostHog Initializer Component
- * Handles initial setup and configuration
- */
-function PostHogInitializer() {
-  const posthog = usePostHog();
-  
-  useEffect(() => {
-    if (!posthog) return;
-    
-    try {
-      // Set up custom properties
-      posthog.register({
-        app_name: 'pepworkday-pipeline',
-        app_version: '1.0.0',
-        environment: process.env.NODE_ENV,
-        deployment_url: process.env.NEXT_PUBLIC_VERCEL_URL || 'localhost',
-      });
-      
-      // Identify organization context
-      posthog.group('organization', 'pepmove', {
-        name: 'PEPMove',
-        organization_id: '5005620',
-        group_id: '129031',
-      });
-      
-      console.log('📈 PostHog initialized successfully');
-      
-      // Track initialization event
-      posthog.capture('app_initialized', {
-        initialization_time: new Date().toISOString(),
-        user_agent: navigator.userAgent,
-        screen_resolution: `${screen.width}x${screen.height}`,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      });
-      
-    } catch (error) {
-      console.error('❌ PostHog initialization error:', error);
-    }
-  }, [posthog]);
-  
-  return null;
-}
+// PostHog temporarily disabled - will be re-enabled after build fixes
 
 /**
- * Hook to access PostHog instance with error handling
+ * Hook to access PostHog instance (temporarily disabled)
  *
- * @returns {Object|null} PostHog instance or null if not available
+ * @returns {null} Always returns null while PostHog is disabled
  */
 export function usePostHogSafe() {
-  try {
-    const posthog = usePostHog();
-    return isAnalyticsEnabled() ? posthog : null;
-  } catch (error) {
-    console.error('❌ PostHog hook error:', error);
-    return null;
-  }
+  return null; // PostHog temporarily disabled
 }
 
 /**
- * Higher-order component to wrap components with PostHog tracking
- * 
+ * Higher-order component (temporarily disabled)
+ *
  * @param {React.Component} WrappedComponent - Component to wrap
  * @param {string} componentName - Name for tracking purposes
- * @returns {React.Component} Wrapped component with tracking
+ * @returns {React.Component} Wrapped component without tracking
  */
 export function withPostHogTracking(WrappedComponent, componentName) {
   return function TrackedComponent(props) {
-    const posthog = usePostHogSafe();
-    
-    useEffect(() => {
-      if (posthog) {
-        posthog.capture('component_mounted', {
-          component_name: componentName,
-          props: Object.keys(props),
-        });
-      }
-    }, [posthog, props]);
-    
     return <WrappedComponent {...props} />;
   };
 }
