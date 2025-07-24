@@ -1,0 +1,50 @@
+[
+  {
+    "id": "WORKBOOK_ID_1",
+    "name": "Primary Dispatch",
+    "description": "Main dispatch workbook for daily operations",
+    "sheets": [
+      {
+        "name": "Summary",
+        "range": "A1:Z100",
+        "description": "Daily dispatch summary data"
+      }
+    ]
+  },
+  {
+    "id": "WORKBOOK_ID_2", 
+    "name": "Secondary Dispatch",
+    "description": "Secondary dispatch workbook for overflow operations",
+    "sheets": [
+      {
+        "name": "Summary",
+        "range": "A1:Z100",
+        "description": "Secondary dispatch summary data"
+      }
+    ]
+  },
+  {
+    "id": "WORKBOOK_ID_3",
+    "name": "Fleet Management",
+    "description": "Fleet management and vehicle tracking workbook",
+    "sheets": [
+      {
+        "name": "Summary",
+        "range": "A1:Z100",
+        "description": "Fleet summary and vehicle status data"
+      }
+    ]
+  },
+  {
+    "id": "WORKBOOK_ID_4",
+    "name": "Analytics Dashboard",
+    "description": "Analytics and reporting workbook for performance metrics",
+    "sheets": [
+      {
+        "name": "Summary",
+        "range": "A1:Z100",
+        "description": "Performance analytics and KPI data"
+      }
+    ]
+  }
+]

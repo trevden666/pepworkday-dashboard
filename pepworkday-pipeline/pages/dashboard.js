@@ -18,6 +18,7 @@ import Image from 'next/image';
 import SummaryChart from '../components/SummaryChart';
 import { dashboardEvents, trackEvent } from '../lib/analytics';
 import { usePostHogSafe } from '../components/PostHogProvider';
+import config from '../config.json';
 
 /**
  * Dashboard page component with ISR and analytics
@@ -30,40 +31,70 @@ import { usePostHogSafe } from '../components/PostHogProvider';
 export default function Dashboard({ initialData, buildTime }) {
   const [apiStatus, setApiStatus] = useState('checking');
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [selectedWorkbook, setSelectedWorkbook] = useState('all');
+  const [workbookData, setWorkbookData] = useState(initialData || {});
+  const [isLoading, setIsLoading] = useState(false);
   const posthog = usePostHogSafe();
   
   /**
-   * Check API health status with analytics tracking
+   * Fetch workbook data from the new multi-workbook API
    */
-  const checkApiStatus = async () => {
+  const fetchWorkbookData = async (workbook = selectedWorkbook) => {
     const startTime = performance.now();
+    setIsLoading(true);
 
     try {
-      dashboardEvents.buttonClicked('refresh_api_status', 'header');
+      dashboardEvents.buttonClicked('fetch_workbook_data', 'dashboard');
 
-      const response = await fetch('/api/summary');
+      const response = await fetch(`/api/fetchSheets?workbook=${workbook}`);
       const result = await response.json();
 
       const duration = performance.now() - startTime;
 
       if (response.ok && result.success) {
+        setWorkbookData(result.data);
         setApiStatus('healthy');
-        dashboardEvents.dataRefreshed('api_summary', duration);
+        setLastRefresh(new Date().toLocaleTimeString());
+        dashboardEvents.dataRefreshed('workbook_fetch', duration);
+
+        // Track with PostHog if available
+        if (posthog) {
+          posthog.capture('workbook_data_fetched', {
+            workbook: selectedWorkbook,
+            response_time: duration,
+            workbooks_count: Object.keys(result.data).length,
+          });
+        }
       } else {
         setApiStatus('error');
-        dashboardEvents.apiError('/api/summary', result.error || 'Unknown error');
+        dashboardEvents.apiError('/api/fetchSheets', result.error || 'Unknown error');
       }
     } catch (error) {
       setApiStatus('error');
-      dashboardEvents.apiError('/api/summary', error.message);
+      dashboardEvents.apiError('/api/fetchSheets', error.message);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    setLastRefresh(new Date());
+  /**
+   * Handle workbook selection change
+   */
+  const handleWorkbookChange = async (event) => {
+    const newWorkbook = event.target.value;
+    setSelectedWorkbook(newWorkbook);
+    await fetchWorkbookData(newWorkbook);
+
+    // Track workbook selection
+    trackEvent('workbook_selected', { workbook: newWorkbook });
+    if (posthog) {
+      posthog.capture('workbook_selected', { workbook: newWorkbook });
+    }
   };
   
-  // Check API status on component mount and track page view
+  // Fetch initial workbook data on component mount and track page view
   useEffect(() => {
-    checkApiStatus();
+    fetchWorkbookData();
 
     // Track dashboard page view
     trackEvent('dashboard_viewed', {
@@ -153,6 +184,35 @@ export default function Dashboard({ initialData, buildTime }) {
               alignItems: 'center',
               gap: '1rem'
             }}>
+              {/* Workbook Selector */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <label htmlFor="workbook-select" style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+                  Workbook:
+                </label>
+                <select
+                  id="workbook-select"
+                  value={selectedWorkbook}
+                  onChange={handleWorkbookChange}
+                  disabled={isLoading}
+                  style={{
+                    padding: '0.375rem 0.75rem',
+                    borderRadius: '0.375rem',
+                    border: '1px solid #d1d5db',
+                    backgroundColor: 'white',
+                    color: '#374151',
+                    fontSize: '0.875rem',
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                    opacity: isLoading ? 0.6 : 1
+                  }}>
+                  <option value="all">All Workbooks</option>
+                  {config.map((workbook, index) => (
+                    <option key={workbook.id} value={index.toString()}>
+                      {workbook.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* API Status Indicator */}
               <div
                 data-testid="api-status"
@@ -168,21 +228,23 @@ export default function Dashboard({ initialData, buildTime }) {
               
               {/* Refresh Button */}
               <button
-                onClick={checkApiStatus}
+                onClick={() => fetchWorkbookData()}
+                disabled={isLoading}
                 style={{
                   padding: '0.5rem 1rem',
-                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  backgroundColor: isLoading ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.2)',
                   color: 'white',
                   border: '1px solid rgba(255,255,255,0.3)',
                   borderRadius: '0.5rem',
-                  cursor: 'pointer',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
                   fontSize: '0.875rem',
-                  transition: 'background-color 0.2s'
+                  transition: 'background-color 0.2s',
+                  opacity: isLoading ? 0.6 : 1
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.3)'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                onMouseOver={(e) => !isLoading && (e.target.style.backgroundColor = 'rgba(255,255,255,0.3)')}
+                onMouseOut={(e) => !isLoading && (e.target.style.backgroundColor = 'rgba(255,255,255,0.2)')}
               >
-                🔄 Refresh
+                {isLoading ? '⏳ Loading...' : '🔄 Refresh'}
               </button>
             </div>
           </div>
@@ -260,62 +322,133 @@ export default function Dashboard({ initialData, buildTime }) {
             </div>
           </div>
           
-          {/* Chart Section */}
-          <div
-            data-testid="dashboard-chart"
-            style={{
+          {/* Workbook Data Section */}
+          {Object.keys(workbookData).length > 0 ? (
+            Object.entries(workbookData).map(([workbookKey, workbook]) => (
+              <div
+                key={workbookKey}
+                data-testid={`workbook-${workbookKey}`}
+                style={{
+                  backgroundColor: 'white',
+                  padding: '2rem',
+                  borderRadius: '0.5rem',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                  border: '1px solid #e5e7eb',
+                  marginBottom: '2rem'
+                }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '1.5rem'
+                }}>
+                  <div>
+                    <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.25rem', fontWeight: 'bold' }}>
+                      📊 {workbook.name || `Workbook ${workbookKey}`}
+                    </h2>
+                    <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
+                      {workbook.description || 'Workbook data visualization'}
+                    </p>
+                    {workbook.error && (
+                      <p style={{ margin: '0.25rem 0 0 0', color: '#dc2626', fontSize: '0.875rem' }}>
+                        ⚠️ Error: {workbook.error}
+                      </p>
+                    )}
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    gap: '0.5rem',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                      Updated: {workbook.fetchedAt ? new Date(workbook.fetchedAt).toLocaleTimeString() : 'Unknown'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sheets Data */}
+                {workbook.sheets && Object.entries(workbook.sheets).map(([sheetName, sheetData]) => (
+                  <div key={sheetName} style={{ marginBottom: '1.5rem' }}>
+                    <h3 style={{ margin: '0 0 1rem 0', color: '#374151', fontSize: '1rem', fontWeight: '600' }}>
+                      📋 {sheetName} Sheet
+                    </h3>
+
+                    {sheetData.data && sheetData.data.length > 0 ? (
+                      <>
+                        {/* Chart Component */}
+                        <div data-testid={`chart-${workbookKey}-${sheetName}`} style={{ marginBottom: '1rem' }}>
+                          <SummaryChart
+                            data={sheetData.data}
+                            height={400}
+                            title={`${workbook.name} - ${sheetName}`}
+                            autoRefresh={false}
+                            refreshInterval={300000}
+                          />
+                        </div>
+
+                        {/* Data Summary */}
+                        <div style={{
+                          padding: '1rem',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '0.375rem',
+                          border: '1px solid #e5e7eb'
+                        }}>
+                          <p style={{ margin: 0, fontSize: '0.875rem', color: '#6b7280' }}>
+                            📊 {sheetData.rowCount} rows • Range: {sheetData.range} •
+                            Last updated: {sheetData.lastUpdated ? new Date(sheetData.lastUpdated).toLocaleString() : 'Unknown'}
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{
+                        padding: '2rem',
+                        textAlign: 'center',
+                        backgroundColor: '#f9fafb',
+                        borderRadius: '0.375rem',
+                        border: '1px solid #e5e7eb'
+                      }}>
+                        <p style={{ margin: 0, color: '#6b7280' }}>
+                          📭 No data available for {sheetName}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))
+          ) : (
+            <div style={{
               backgroundColor: 'white',
-              padding: '2rem',
+              padding: '3rem',
               borderRadius: '0.5rem',
               boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              border: '1px solid #e5e7eb'
+              border: '1px solid #e5e7eb',
+              textAlign: 'center'
             }}>
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '1.5rem'
-            }}>
-              <div>
-                <h2 style={{ margin: 0, color: '#1f2937', fontSize: '1.25rem', fontWeight: 'bold' }}>
-                  📈 Jobs by Address
-                </h2>
-                <p style={{ margin: '0.25rem 0 0 0', color: '#6b7280', fontSize: '0.875rem' }}>
-                  Total job count visualization from Google Sheets data
-                </p>
-              </div>
-              
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                alignItems: 'center'
-              }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  color: '#374151'
-                }}>
-                  <input
-                    type="checkbox"
-                    defaultChecked={false}
-                    style={{ margin: 0 }}
-                  />
-                  Auto-refresh (5min)
-                </label>
-              </div>
+              <p style={{ margin: 0, color: '#6b7280', fontSize: '1.125rem' }}>
+                {isLoading ? '⏳ Loading workbook data...' : '📭 No workbook data available'}
+              </p>
+              {!isLoading && (
+                <button
+                  onClick={() => fetchWorkbookData()}
+                  style={{
+                    marginTop: '1rem',
+                    padding: '0.75rem 1.5rem',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '0.5rem',
+                    cursor: 'pointer',
+                    fontSize: '0.875rem',
+                    fontWeight: '500'
+                  }}
+                >
+                  🔄 Load Data
+                </button>
+              )}
             </div>
-            
-            {/* Chart Component */}
-            <div data-testid="summary-chart">
-              <SummaryChart
-                height={500}
-                autoRefresh={false}
-                refreshInterval={300000}
-              />
-            </div>
-          </div>
+          )}
           
           {/* Footer Info */}
           <div style={{

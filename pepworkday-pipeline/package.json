@@ -10,6 +10,7 @@
     "lint": "next lint",
     "test": "node --test tests/*.js",
     "test:api": "node tests/testApiSummary.js",
+    "test:sheets": "node tests/testFetchSheets.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "playwright:install": "playwright install"

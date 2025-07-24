@@ -11,10 +11,12 @@ pepworkday-pipeline/
 │   └── PostHogProvider.js     # PostHog analytics provider
 ├── pages/
 │   ├── api/
-│   │   └── summary.js         # Secure Next.js API route for Google Sheets data
+│   │   ├── summary.js         # Legacy single-sheet API route
+│   │   └── fetchSheets.js     # Multi-workbook batch fetch API route
 │   ├── _app.js                # Next.js app with analytics and error boundaries
-│   ├── dashboard.js           # Main dashboard page with ISR
+│   ├── dashboard.js           # Main dashboard page with multi-workbook support
 │   └── index.js               # Home page with redirect
+├── config.json                # Multi-workbook configuration file
 ├── lib/
 │   ├── analytics.js           # Unified analytics (GA4 + PostHog)
 │   ├── dataAccess.js          # Secure data access layer
@@ -27,6 +29,7 @@ pepworkday-pipeline/
 ├── tests/
 │   ├── testGcpCredentials.js  # Test suite for credentials helper
 │   ├── testApiSummary.js      # API endpoint smoke tests
+│   ├── testFetchSheets.js     # Multi-workbook API tests
 │   ├── testDashboardRender.js # E2E tests with Playwright
 │   ├── global-setup.js        # Playwright global setup
 │   └── global-teardown.js     # Playwright global teardown
@@ -104,6 +107,100 @@ npm run playwright:install
 ```bash
 npm run build
 npm start
+```
+
+## 📊 Multi-Workbook Configuration
+
+The dashboard supports fetching data from multiple Google Sheets workbooks using a configuration-driven approach.
+
+### Configuration File (`config.json`)
+
+Edit `config.json` to add, remove, or modify workbooks:
+
+```json
+[
+  {
+    "id": "YOUR_SPREADSHEET_ID_1",
+    "name": "Primary Dispatch",
+    "description": "Main dispatch workbook for daily operations",
+    "sheets": [
+      {
+        "name": "Summary",
+        "range": "A1:Z100",
+        "description": "Daily dispatch summary data"
+      }
+    ]
+  },
+  {
+    "id": "YOUR_SPREADSHEET_ID_2",
+    "name": "Secondary Dispatch",
+    "description": "Secondary dispatch workbook for overflow operations",
+    "sheets": [
+      {
+        "name": "Summary",
+        "range": "A1:Z100",
+        "description": "Secondary dispatch summary data"
+      }
+    ]
+  }
+]
+```
+
+### API Usage
+
+The `/api/fetchSheets` endpoint supports the following query parameters:
+
+```javascript
+// Fetch all workbooks
+const response = await fetch('/api/fetchSheets?workbook=all');
+
+// Fetch specific workbook by index (0-3)
+const response = await fetch('/api/fetchSheets?workbook=0');
+
+// Response format
+{
+  "success": true,
+  "workbooksRequested": "all",
+  "workbooksCount": 4,
+  "data": {
+    "workbook_0": {
+      "id": "SPREADSHEET_ID",
+      "name": "Primary Dispatch",
+      "description": "Main dispatch workbook",
+      "sheets": {
+        "Summary": {
+          "data": [["Header1", "Header2"], ["Row1Col1", "Row1Col2"]],
+          "range": "A1:Z100",
+          "rowCount": 50,
+          "lastUpdated": "2024-01-15T10:30:00.000Z"
+        }
+      },
+      "fetchedAt": "2024-01-15T10:30:00.000Z"
+    }
+  }
+}
+```
+
+### Dashboard UI
+
+The dashboard includes:
+
+- **Workbook Selector**: Dropdown to choose between individual workbooks or "All Workbooks"
+- **Dynamic Charts**: Each workbook's data is displayed in separate chart sections
+- **Real-time Updates**: Refresh button updates data for the selected workbook(s)
+- **Error Handling**: Individual workbook errors don't affect other workbooks
+
+### Testing Multi-Workbook API
+
+```bash
+# Test single workbook
+npm run test:api -- --grep "single workbook"
+
+# Test all workbooks
+npm run test:api -- --grep "all workbooks"
+
+# Run full multi-workbook test suite
+node tests/testFetchSheets.js
 ```
 
 ## 🔧 Components

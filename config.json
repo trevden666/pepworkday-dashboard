@@ -1,0 +1,18 @@
+[
+  {
+    "id": "WORKBOOK_ID_1",
+    "sheets": [{ "name": "Summary", "range": "A1:Z100" }]
+  },
+  {
+    "id": "WORKBOOK_ID_2",
+    "sheets": [{ "name": "Summary", "range": "A1:Z100" }]
+  },
+  {
+    "id": "WORKBOOK_ID_3",
+    "sheets": [{ "name": "Summary", "range": "A1:Z100" }]
+  },
+  {
+    "id": "WORKBOOK_ID_4",
+    "sheets": [{ "name": "Summary", "range": "A1:Z100" }]
+  }
+]
