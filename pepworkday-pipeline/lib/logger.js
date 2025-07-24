@@ -16,7 +16,7 @@
  * @version 1.0.0
  */
 
-import { log } from '@vercel/log';
+// Using console.log instead of @vercel/log (which doesn't exist)
 
 /**
  * Log levels
@@ -108,11 +108,8 @@ class Logger {
       } : error,
     }, req);
     
-    if (this.isVercel) {
-      log(JSON.stringify(logEntry));
-    } else {
-      console.error('❌', JSON.stringify(logEntry, null, 2));
-    }
+    // Log to console (works in both local and Vercel environments)
+    console.error('❌', JSON.stringify(logEntry, null, 2));
   }
   
   /**
@@ -125,11 +122,8 @@ class Logger {
   warn(message, data = {}, req = null) {
     const logEntry = this.formatLogEntry(LOG_LEVELS.WARN, message, data, req);
     
-    if (this.isVercel) {
-      log(JSON.stringify(logEntry));
-    } else {
-      console.warn('⚠️', JSON.stringify(logEntry, null, 2));
-    }
+    // Log to console (works in both local and Vercel environments)
+    console.warn('⚠️', JSON.stringify(logEntry, null, 2));
   }
   
   /**
@@ -142,11 +136,8 @@ class Logger {
   info(message, data = {}, req = null) {
     const logEntry = this.formatLogEntry(LOG_LEVELS.INFO, message, data, req);
     
-    if (this.isVercel) {
-      log(JSON.stringify(logEntry));
-    } else {
-      console.log('ℹ️', JSON.stringify(logEntry, null, 2));
-    }
+    // Log to console (works in both local and Vercel environments)
+    console.log('ℹ️', JSON.stringify(logEntry, null, 2));
   }
   
   /**
